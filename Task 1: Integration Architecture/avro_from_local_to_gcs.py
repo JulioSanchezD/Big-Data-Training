@@ -3,10 +3,12 @@ from apache_beam.io import WriteToAvro
 from apache_beam.pipeline import Pipeline
 from apache_beam.options.pipeline_options import PipelineOptions
 from apache_beam.options.pipeline_options import SetupOptions
+from apache_beam.io.gcp.gcsio import GcsIO
 from avro.datafile import DataFileReader
 from avro.io import DatumReader
 import argparse
-import pprint
+import json
+# import pprint
 
 
 input_file = "data/test-dataset.avro"
@@ -58,14 +60,22 @@ if __name__ == "__main__":
         '--job_name=parse-avro',
     ])
 	pipeline_options = PipelineOptions(pipeline_args)
+	avro_schema = get_schema(input_file)
 
 	# Debug
 	# pp = pprint.PrettyPrinter(indent=4)
 	# pp.pprint(get_schema(input_file))
 	
+	# Execute pipeline
 	with Pipeline(options=pipeline_options) as p:
 		(
 			p
 			| 'Read Avro' >> ReadFromAvro(known_args.input)
-			| 'Write Avro to GCS' >> WriteToAvro(known_args.output, schema=get_schema(input_file))
+			| 'Write Avro to GCS' >> WriteToAvro(known_args.output, schema='SCHEMA_AUTODETECT')
 		)
+	
+	# Write schema to json
+	avro_schema_json = json.dumps(avro_schema)
+	gcs_client = GcsIO()
+	with gcs_client.open("gs://big-data-training-julio/test-dataset_schema.json", mode='w', mime_type="application/json") as buffer:
+		buffer.write(avro_schema_json.encode("utf-8"))
